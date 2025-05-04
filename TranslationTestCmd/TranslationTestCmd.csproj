@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+        <RootNamespace>TranslationsTestCmd</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\LibreTranslateTranslationService\LibreTranslateTranslationService.csproj" />
+      <ProjectReference Include="..\TranslationCore\TranslationCore.csproj" />
+      <ProjectReference Include="..\TranslationProperties\TranslationProperties.csproj" />
+      <ProjectReference Include="..\TranslationTemplate\TranslationTemplate.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="23.5.1" />
+      <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.0" />
+      <PackageReference Include="System.Security.Permissions" Version="9.0.4" />
+    </ItemGroup>
+
+</Project>

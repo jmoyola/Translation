@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>11</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\DataBaseUtils\DataBaseUtils\DataBaseUtils.csproj" />
+      <ProjectReference Include="..\TranslationService\TranslationService.csproj" />
+    </ItemGroup>
+
+</Project>
