@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Resources;
 using System.Resources.NetStandard;
 using System.Text.RegularExpressions;
@@ -14,7 +16,7 @@ namespace ResxTranslation.Imp;
 public class ResxBatchTranslation:BaseBatchTranslation
 {
     public DirectoryInfo BaseDirectory { get; set; }
-    public bool UseDefaultForEnglish { get; set; }
+    public string DefaultLanguage { get; set; } = "en";
     
     public string TranslatePattern { get; set; } = ".*";
     
@@ -27,27 +29,33 @@ public class ResxBatchTranslation:BaseBatchTranslation
         Regex translateRegex = new Regex(TranslatePattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
 
         var fromLanguageResourceFiles = BaseDirectory.EnumerateFiles("*.resx", SearchOption.AllDirectories);
-        Regex r=new Regex(@"(\." + fromLanguage + @")?\.resx$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
+        //Regex r=new Regex(@"(\." + fromLanguage + @")?\.resx$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
         
         foreach (var fromLanguageResourceFile in fromLanguageResourceFiles)
         {
-            Match m = r.Match(fromLanguageResourceFile.Name);
-            if(!m.Success) continue;
+            string fromLanguageBaseName;
+            string[] resxNameParts=fromLanguageResourceFile.Name.Split('.');
+            if(resxNameParts.Length==2 && fromLanguage.Equals(DefaultLanguage, StringComparison.OrdinalIgnoreCase))
+                fromLanguageBaseName=resxNameParts[0];
+            else if(resxNameParts.Length>2 && resxNameParts[resxNameParts.Length-2].Equals(fromLanguage, StringComparison.OrdinalIgnoreCase))
+                fromLanguageBaseName=String.Join(".", resxNameParts.Take(resxNameParts.Length-2));
+            else
+                continue;
             
-            string toFileName=string.IsNullOrEmpty(m.Groups[2].Value)? fromLanguageResourceFile.Replace(".resx", $".{toLanguage}.resx")
-            FileInfo toLanguageResourceFile=new FileInfo(fromLanguageResourceFile.Directory.FullName
+            FileInfo toLanguageResourceFile=new FileInfo(fromLanguageResourceFile.Directory?.FullName
                                                          + Path.DirectorySeparatorChar
-                                                         + .r.Replace(fromLanguageResourceFile.Name, "\\." + toLanguage + "\\."));
+                                                         + fromLanguageBaseName + "." + toLanguage + ".resx");
             
             ResxFile fromLanguageResourceFileHandler = new ResxFile(fromLanguageResourceFile);
             ResxFile toLanguageResourceFileHandler = new ResxFile(toLanguageResourceFile);
 
             var fromLanguageResourceFileReaderFiltered = fromLanguageResourceFileHandler.Where(v =>
                 translateRegex.IsMatch(v.Key)
-                && v.Value.GetValueTypeName((ITypeResolutionService)null) == "System.String");
+                && v.Value.GetValueTypeName((AssemblyName[])null).StartsWith("System.String,"));
+
             foreach (var kv in fromLanguageResourceFileReaderFiltered)
             {
-                string translation = TranslationService.Translate(kv.Value.GetValue((ITypeResolutionService)null).ToString(), fromLanguage, toLanguage).Result;
+                string translation = TranslationService.Translate(kv.Value.GetValue((AssemblyName[])null).ToString(), fromLanguage, toLanguage).Result;
                 
                 if(toLanguageResourceFileHandler.ContainsKey(kv.Key))
                     toLanguageResourceFileHandler[kv.Key]=new ResXDataNode(kv.Key, translation);

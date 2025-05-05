@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Resources.NetStandard;
@@ -24,8 +25,8 @@ public class ResxFile:Dictionary<string, ResXDataNode>
         Clear();
         using var rr = new ResXResourceReader(_file.FullName);
         rr.UseResXDataNodes = true;
-        foreach (ResXDataNode r in rr)
-            Add(r.Name, r);
+        foreach (DictionaryEntry r in rr)
+            Add(r.Key.ToString(), (ResXDataNode)r.Value);
     }
 
     public void Save()

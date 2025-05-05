@@ -121,8 +121,10 @@ class Program
         
         ResxBatchTranslation bs = new ResxBatchTranslation();
         bs.TranslationService = txService;
-        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
-        bs.Translate("EN", "PT");
+        //bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
+        bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
+        bs.DefaultLanguage = "en";
+        bs.Translate("en", "zh");
     }
 }
 
