@@ -18,8 +18,9 @@ class Program
         try
         {
             //TestTemplateBatchTranslation(args);
-            CoreBatchTranslation(args);
+            //CoreBatchTranslation(args);
             //TestPropertiesBatchTranslations(args);
+            TestResxBatchTranslations(args);
             Console.WriteLine("OK!");
         }
         catch (Exception ex)
@@ -120,9 +121,7 @@ class Program
         
         ResxBatchTranslation bs = new ResxBatchTranslation();
         bs.TranslationService = txService;
-        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\frontend-locales_pam\TALO");
-        bs.FromLanguageFilePattern = @"\*.\.{fromLanguage}\.resx";
-        bs.ToLanguageFilePattern = @"\{toLanguage}\{fileName}";
+        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
         bs.Translate("EN", "PT");
     }
 }

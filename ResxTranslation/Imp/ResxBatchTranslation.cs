@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.ComponentModel.Design;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Resources;
@@ -13,52 +14,47 @@ namespace ResxTranslation.Imp;
 public class ResxBatchTranslation:BaseBatchTranslation
 {
     public DirectoryInfo BaseDirectory { get; set; }
-    public string FromLanguageFilePattern { get; set; }
-    public string ToLanguageFilePattern { get; set; }
+    public bool UseDefaultForEnglish { get; set; }
+    
     public string TranslatePattern { get; set; } = ".*";
     
     public override void Translate(string fromLanguage, string toLanguage)
     {
         if(BaseDirectory==null) throw new TranslationException("Base directory not set");
         if (!BaseDirectory.Exists) throw new TranslationException($"Base directory '{BaseDirectory.FullName}' does not exist");
-        if(String.IsNullOrEmpty(FromLanguageFilePattern)) throw new TranslationException("FromLanguageFilePattern not set");
-        if(String.IsNullOrEmpty(ToLanguageFilePattern)) throw new TranslationException("ToLanguageFilePattern not set");
         if(String.IsNullOrEmpty(TranslatePattern)) throw new TranslationException("TranslatePattern not set");
         
         Regex translateRegex = new Regex(TranslatePattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
-        
-        PlaceAndHolder ph=new PlaceAndHolder()
-        {
-            {"{baseDirectory}", BaseDirectory.FullName},
-            {"{fromLanguage}", fromLanguage},
-            {"{toLanguage}", toLanguage},
-            {"{fileName}", ""},
-        };
-        
-        string fromLanguageFilePattern=ph.Replace(FromLanguageFilePattern);
 
-        var fromLanguageResourceFiles = BaseDirectory.EnumerateFiles(FromLanguageFilePattern, SearchOption.AllDirectories);
+        var fromLanguageResourceFiles = BaseDirectory.EnumerateFiles("*.resx", SearchOption.AllDirectories);
+        Regex r=new Regex(@"(\." + fromLanguage + @")?\.resx$", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
         
         foreach (var fromLanguageResourceFile in fromLanguageResourceFiles)
         {
-            ph["{fileName}"] = fromLanguageResourceFile.Name;
-            string toLanguageFilePattern=ph.Replace(ToLanguageFilePattern);
+            Match m = r.Match(fromLanguageResourceFile.Name);
+            if(!m.Success) continue;
             
-            ResxFile fromLanguageResourceFileReader = new ResxFile(fromLanguageResourceFile);
-            ResxFile toLanguageResourceFileWriter = new ResxFile(new FileInfo(toLanguageFilePattern));
+            string toFileName=string.IsNullOrEmpty(m.Groups[2].Value)? fromLanguageResourceFile.Replace(".resx", $".{toLanguage}.resx")
+            FileInfo toLanguageResourceFile=new FileInfo(fromLanguageResourceFile.Directory.FullName
+                                                         + Path.DirectorySeparatorChar
+                                                         + .r.Replace(fromLanguageResourceFile.Name, "\\." + toLanguage + "\\."));
             
-            
-            foreach (var kv in fromLanguageResourceFileReader.Where(v=>translateRegex.IsMatch(v.Key)
-                     && v.Value.GetValueTypeName((ITypeResolutionService)null)=="System.String"))
+            ResxFile fromLanguageResourceFileHandler = new ResxFile(fromLanguageResourceFile);
+            ResxFile toLanguageResourceFileHandler = new ResxFile(toLanguageResourceFile);
+
+            var fromLanguageResourceFileReaderFiltered = fromLanguageResourceFileHandler.Where(v =>
+                translateRegex.IsMatch(v.Key)
+                && v.Value.GetValueTypeName((ITypeResolutionService)null) == "System.String");
+            foreach (var kv in fromLanguageResourceFileReaderFiltered)
             {
                 string translation = TranslationService.Translate(kv.Value.GetValue((ITypeResolutionService)null).ToString(), fromLanguage, toLanguage).Result;
                 
-                if(toLanguageResourceFileWriter.ContainsKey(kv.Key))
-                    toLanguageResourceFileWriter[kv.Key]=new ResXDataNode(kv.Key, translation);
+                if(toLanguageResourceFileHandler.ContainsKey(kv.Key))
+                    toLanguageResourceFileHandler[kv.Key]=new ResXDataNode(kv.Key, translation);
                 else
-                    toLanguageResourceFileWriter.Add(kv.Key, new ResXDataNode(kv.Key, translation));
+                    toLanguageResourceFileHandler.Add(kv.Key, new ResXDataNode(kv.Key, translation));
             }
-            toLanguageResourceFileWriter.Save();
+            toLanguageResourceFileHandler.Save();
         }
         
     }
