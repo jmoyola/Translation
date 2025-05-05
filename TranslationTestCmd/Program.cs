@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using Oracle.ManagedDataAccess.Client;
+using ResxTranslation.Imp;
 using TranslationCore.Imp;
 using TranslationService.Core;
 using TranslationService.Utils;
@@ -106,6 +107,22 @@ class Program
         bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\frontend-locales_pam\TALO");
         bs.FromLanguageFilePattern = @"{baseDirectory}\{fromLanguage}\*.json";
         bs.ToLanguageFilePattern = @"{baseDirectory}\{toLanguage}\{fileName}";
+        bs.Translate("EN", "PT");
+    }
+    
+    public void TestResxBatchTranslations(string[] args)
+    {
+        ITranslationService txService;
+        //txService = new FakeTranslationService();
+        DirectoryInfo translationSeviceCacheBaseDir = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "translationServiceCacheBaseDir");
+        txService = new LibreTranslateTranslationService.Imp.LibreTranslateTranslationService(){Url = "http://127.0.0.1:5000/translate"};
+        txService=new TranslationServiceCache(txService, translationSeviceCacheBaseDir);
+        
+        ResxBatchTranslation bs = new ResxBatchTranslation();
+        bs.TranslationService = txService;
+        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\frontend-locales_pam\TALO");
+        bs.FromLanguageFilePattern = @"\*.\.{fromLanguage}\.resx";
+        bs.ToLanguageFilePattern = @"\{toLanguage}\{fileName}";
         bs.Translate("EN", "PT");
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using TranslationService.Core;
 using TranslationService.Utils;
 
@@ -12,13 +13,17 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
     public DirectoryInfo BaseDirectory { get; set; }
     public string FromLanguageFilePattern { get; set; }
     public string ToLanguageFilePattern { get; set; }
+    public string TranslatePattern { get; set; } = ".*";
     
     public override void Translate(string fromLanguage, string toLanguage)
     {
         if(BaseDirectory==null) throw new TranslationException("Base directory not set");
         if(String.IsNullOrEmpty(FromLanguageFilePattern)) throw new TranslationException("FromLanguageFilePattern not set");
         if(String.IsNullOrEmpty(ToLanguageFilePattern)) throw new TranslationException("ToLanguageFilePattern not set");
+        if(String.IsNullOrEmpty(TranslatePattern)) throw new TranslationException("TranslatePattern not set");
         if(Serializer==null) throw new TranslationException("Serializer not set");
+        
+        Regex translateRegex = new Regex(TranslatePattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
         
         PlaceAndHolder ph=new PlaceAndHolder()
         {
@@ -28,9 +33,9 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
             {"{fileName}", ""},
         };
         
-        FromLanguageFilePattern=ph.Replace(FromLanguageFilePattern);
+        string fromLanguageFilePattern=ph.Replace(FromLanguageFilePattern);
 
-        FileInfo fromDir = new FileInfo(FromLanguageFilePattern);
+        FileInfo fromDir = new FileInfo(fromLanguageFilePattern);
         
         foreach (FileInfo fromLanguageFile in fromDir.Directory.GetFiles(fromDir.Name, SearchOption.TopDirectoryOnly))
         {
@@ -51,7 +56,7 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
             IFileDictionary<string, string> toLanguagePropertiesFile =
                 new FileDictionary<string, string>(toLanguageFile);
 
-            foreach (var kv in fromLanguagePropertiesFile)
+            foreach (var kv in fromLanguagePropertiesFile.Where(v=>translateRegex.IsMatch(v.Key)))
             {
                 string translation = TranslationService.Translate(kv.Value, fromLanguage, toLanguage).Result;
                 toLanguagePropertiesFile.Add(kv.Key, translation);

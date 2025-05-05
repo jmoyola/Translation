@@ -10,6 +10,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\LibreTranslateTranslationService\LibreTranslateTranslationService.csproj" />
+      <ProjectReference Include="..\ResxTranslation\ResxTranslation.csproj" />
       <ProjectReference Include="..\TranslationCore\TranslationCore.csproj" />
       <ProjectReference Include="..\TranslationProperties\TranslationProperties.csproj" />
       <ProjectReference Include="..\TranslationTemplate\TranslationTemplate.csproj" />
