@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using System.Resources.NetStandard;
 using System.Text.RegularExpressions;
 using TranslationService.Core;
 
@@ -45,27 +43,26 @@ public class ResxBatchTranslation:BaseBatchTranslation
                                                          + fromLanguageBaseName + "." + toLanguage + ".resx");
             
             ResxFile fromLanguageResourceFileHandler = new ResxFile(fromLanguageResourceFile);
-            ResxFile toLanguageResourceFileHandler = new ResxFile(toLanguageResourceFile);
+            fromLanguageResourceFileHandler.Load();
+            
+            
+            ResxFile toLanguageResourceFileHandler = fromLanguageResourceFile.Exists? new ResxFile(fromLanguageResourceFile).Load():fromLanguageResourceFileHandler.Clone(toLanguageResourceFile);
 
-            foreach (var kv in fromLanguageResourceFileHandler)
+            foreach (var kv in fromLanguageResourceFileHandler.Entries)
             {
-                ResXDataNode rdn = kv.Value;
-                if (translateKeyFilter.IsMatch(kv.Key)
-                    && kv.Value.GetValueTypeName((AssemblyName[])null).StartsWith("System.String,"))
+                if (translateKeyFilter.IsMatch(kv.Key.Value))
                 {
-                    if (kv.Key.Contains(".") && !controlPropertiesToTranslateRegex.IsMatch(kv.Key))
+                    if (kv.Key.Value.Contains(".") && !controlPropertiesToTranslateRegex.IsMatch(kv.Key.Value))
                         continue;
 
                     
-                    string text = kv.Value.GetValue((AssemblyName[])null).ToString();
+                    string text = kv.Value.Value;
                     string translation = TranslationService
                         .Translate(text, fromLanguage, toLanguage).Result;
 
-                    OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, kv.Key, text, translation, fromLanguageResourceFile.FullName));
-                    rdn= new ResXDataNode(kv.Key, translation);
+                    toLanguageResourceFileHandler.SetEntry(kv.Key.Value, translation);
+                    OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, kv.Key.Value, text, translation, fromLanguageResourceFile.FullName));
                 }
-                
-                toLanguageResourceFileHandler[kv.Key] = rdn;
             }
             toLanguageResourceFileHandler.Save();
         }
