@@ -2,9 +2,9 @@
 using Oracle.ManagedDataAccess.Client;
 using ResxTranslation.Imp;
 using TranslationCore.Imp;
+using TranslationProperties.Imp;
 using TranslationService.Core;
 using TranslationService.Utils;
-using TranslationsProperties.Imp;
 using TranslationsWT.Imp;
 
 
@@ -81,7 +81,6 @@ class Program
             
             CoreBatchTranslation bs = new CoreBatchTranslation();
             bs.TranslationService = txService;
-            bs.PropertiesFile = new FileInfo(@"C:\Users\j.oyola\OneDrive - SportradarAG\Desktop\en.properties");
             bs.Cnx = cnx;
 
             cnx.Open();
@@ -113,6 +112,8 @@ class Program
     
     public void TestResxBatchTranslations(string[] args)
     {
+        //var PropertiesFile = new FileDictionary<string, string>(PropertiesFile);
+        
         ITranslationService txService;
         //txService = new FakeTranslationService();
         DirectoryInfo translationSeviceCacheBaseDir = new DirectoryInfo(Environment.GetFolderPath(Environment.SpecialFolder.Desktop) + "translationServiceCacheBaseDir");
@@ -121,10 +122,22 @@ class Program
         
         ResxBatchTranslation bs = new ResxBatchTranslation();
         bs.TranslationService = txService;
-        //bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
-        bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
+        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
+        //bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
         bs.DefaultLanguage = "en";
-        bs.Translate("en", "zh");
+        
+        Translate(bs, "en", "pt");
+        
+    }
+
+    private void Translate(IBatchTranslation bs, string fromLanguage, string toLanguage)
+    {
+        
+        bs.TranslationEvent += (sender, eventArgs) =>
+        {
+            Console.WriteLine($"{eventArgs.Resource}: {eventArgs.ResourceEntryId} ({eventArgs.FromLanguage}->{eventArgs.ToLanguage}) {eventArgs.FromLanguageText}->{eventArgs.ToLanguageText}  " );
+        };
+        bs.Translate(fromLanguage, toLanguage);
     }
 }
 

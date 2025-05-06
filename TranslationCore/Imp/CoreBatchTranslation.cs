@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Data;
-using System.Data.Common;
-using System.IO;
 using DataBaseUtils.Utils;
 using TranslationService.Core;
 using TranslationService.Utils;
@@ -13,11 +11,13 @@ namespace TranslationCore.Imp
     {
         public IDbConnection Cnx { get; set; }
         public bool Test { get; set; } = true;
-        public string Filter { get; set; } = string.Empty;
-        public FileInfo PropertiesFile {get;set; }
+
         public override void Translate(string fromLanguage, string toLanguage)
         {
             if(Cnx==null)throw new ArgumentNullException(nameof(Cnx));
+            if(TranslateKeyFilter==null) throw new TranslationException("TranslateKeyFilter not set");
+            if(ResourceFilter==null) throw new TranslationException("ResourceFilter not set");
+
 
             IDictionarySerializer<string, string> serializer = new PropertiesDictionarySerializer();
             
@@ -29,19 +29,19 @@ namespace TranslationCore.Imp
             try
             {
                 IDbCommand cmd = Cnx.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM DBCORE.DCAPPLICATIONMESSAGE WHERE IDDCLANGUAGE ='{srLanguage}'" + (string.IsNullOrEmpty(Filter)?"":" AND "+ Filter);
+                cmd.CommandText = $"SELECT * FROM DBCORE.DCAPPLICATIONMESSAGE WHERE IDDCLANGUAGE ='{srLanguage}' AND MESSAGECODE LIKE {TranslateKeyFilter.ToSql()}";
                 IDataReader dr = cmd.ExecuteReader();
-                IFileDictionary<string, string> dic = null;
-                if (PropertiesFile != null) dic = new FileDictionary<string, string>(PropertiesFile);
+                
                 while (dr.Read())
                 {
                     string fromLngMsg = dr.Get<String>("USERDESCRIPTION");
                     string fromLngIntMsg = dr.Get<String>("INTERNALDESCRIPTION");
+                    string messageCatalog = dr.Get<String>("MESSAGECATALOG");
                     string messageCode = dr.Get<String>("MESSAGECODE");
+                    
 
                     string toLngMsg = TranslationService.Translate(fromLngMsg, fromLanguage, toLanguage).Result;
                     string toLngIntMsg = TranslationService.Translate(fromLngIntMsg, fromLanguage, toLanguage).Result;
-                    dic?.Add(messageCode, toLngIntMsg+"|"+toLngMsg);
                     
                     Console.WriteLine($"{fromLngMsg}={toLngMsg}");
 
@@ -50,9 +50,9 @@ namespace TranslationCore.Imp
                         using (IDbCommand insertCmd = Cnx.CreateCommand())
                         {
                             DbCommandText cmdText =new DbCommandText();
-                            cmdText.Add("IDDCMESSAGECATALOG", messageCode);
-                            cmdText.Add("IDDCLANGUAGE", toLanguage);
-                            cmdText.Add("MESSAGECODE", dr, "MESSAGECODE");
+                            cmdText.Add("IDDCMESSAGECATALOG", messageCatalog);
+                            cmdText.Add("IDDCLANGUAGE", srLanguage);
+                            cmdText.Add("MESSAGECODE", messageCode);
                             cmdText.Add("NOOFPARAMETERS", dr, "NOOFPARAMETERS");
                             cmdText.Add("INTERNALDESCRIPION", toLngIntMsg);
                             cmdText.Add("USERDESCRIPION", toLngMsg);
@@ -71,9 +71,8 @@ namespace TranslationCore.Imp
                             }
                         }
                     }
+                    OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, messageCatalog + "|" +srLanguage + "|" + messageCode, fromLngMsg + "" + fromLngIntMsg , toLngMsg + "|" + toLngIntMsg, "DBCORE.DCAPPLICATIONMESSAGE"));
                 }
-
-                dic?.Save(serializer);
             }
             catch (Exception ex)
             {

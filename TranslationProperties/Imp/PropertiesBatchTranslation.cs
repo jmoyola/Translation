@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using TranslationService.Core;
 using TranslationService.Utils;
 
-namespace TranslationsProperties.Imp;
+namespace TranslationProperties.Imp;
 
 public class PropertiesBatchTranslation:BaseBatchTranslation
 {
@@ -13,17 +13,18 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
     public DirectoryInfo BaseDirectory { get; set; }
     public string FromLanguageFilePattern { get; set; }
     public string ToLanguageFilePattern { get; set; }
-    public string TranslatePattern { get; set; } = ".*";
     
     public override void Translate(string fromLanguage, string toLanguage)
     {
         if(BaseDirectory==null) throw new TranslationException("Base directory not set");
         if(String.IsNullOrEmpty(FromLanguageFilePattern)) throw new TranslationException("FromLanguageFilePattern not set");
         if(String.IsNullOrEmpty(ToLanguageFilePattern)) throw new TranslationException("ToLanguageFilePattern not set");
-        if(String.IsNullOrEmpty(TranslatePattern)) throw new TranslationException("TranslatePattern not set");
+        if(TranslateKeyFilter==null) throw new TranslationException("TranslateKeyFilter not set");
+        if(ResourceFilter==null) throw new TranslationException("ResourceFilter not set");
         if(Serializer==null) throw new TranslationException("Serializer not set");
         
-        Regex translateRegex = new Regex(TranslatePattern, RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        Regex translateRegex = new Regex(TranslateKeyFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        Regex resourceRegex = new Regex(ResourceFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
         
         PlaceAndHolder ph=new PlaceAndHolder()
         {
@@ -37,8 +38,10 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
 
         FileInfo fromDir = new FileInfo(fromLanguageFilePattern);
         
-        foreach (FileInfo fromLanguageFile in fromDir.Directory.GetFiles(fromDir.Name, SearchOption.TopDirectoryOnly))
+        foreach (FileInfo fromLanguageFile in fromDir.Directory.EnumerateFiles(fromDir.Name, SearchOption.TopDirectoryOnly))
         {
+            if(!resourceRegex.IsMatch(fromLanguageFile.Name)) continue;
+            
             if (!fromLanguageFile.Exists)
                 throw new TranslationException($"FromLanguageFile '{fromLanguageFile.FullName}' not exists");
             IFileDictionary<string, string> fromLanguagePropertiesFile =
@@ -59,6 +62,8 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
             foreach (var kv in fromLanguagePropertiesFile.Where(v=>translateRegex.IsMatch(v.Key)))
             {
                 string translation = TranslationService.Translate(kv.Value, fromLanguage, toLanguage).Result;
+                OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, kv.Key, kv.Value, translation, fromLanguageFile.FullName));
+                
                 toLanguagePropertiesFile.Add(kv.Key, translation);
             }
 
