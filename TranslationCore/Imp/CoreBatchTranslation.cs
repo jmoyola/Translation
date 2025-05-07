@@ -17,27 +17,23 @@ namespace TranslationCore.Imp
             if(Cnx==null)throw new ArgumentNullException(nameof(Cnx));
             if(TranslateKeyFilter==null) throw new TranslationException("TranslateKeyFilter not set");
             if(ResourceFilter==null) throw new TranslationException("ResourceFilter not set");
-
-
-            IDictionarySerializer<string, string> serializer = new PropertiesDictionarySerializer();
             
             string srLanguage = fromLanguage.Equals("en", StringComparison.InvariantCultureIgnoreCase)
                 ? "UK"
                 : fromLanguage;
-
-            ConnectionState oldState = Cnx.State;
+            
             try
             {
-                IDbCommand cmd = Cnx.CreateCommand();
-                cmd.CommandText = $"SELECT * FROM DBCORE.DCAPPLICATIONMESSAGE WHERE IDDCLANGUAGE ='{srLanguage}' AND MESSAGECODE LIKE {TranslateKeyFilter.ToSql()}";
-                IDataReader dr = cmd.ExecuteReader();
+                string cmd = $"SELECT * FROM DBCORE.DCAPPLICATIONMESSAGE WHERE IDDCLANGUAGE ='{srLanguage}' AND MESSAGECODE LIKE {TranslateKeyFilter.ToSql()}";
+                var items = Cnx.SelectRows(cmd, true);
                 
-                while (dr.Read())
+                for(int iItemIndex=0; iItemIndex<items.Count; iItemIndex++)
                 {
-                    string fromLngMsg = dr.Get<String>("USERDESCRIPTION");
-                    string fromLngIntMsg = dr.Get<String>("INTERNALDESCRIPTION");
-                    string messageCatalog = dr.Get<String>("MESSAGECATALOG");
-                    string messageCode = dr.Get<String>("MESSAGECODE");
+                    var item=items[iItemIndex];
+                    string fromLngMsg = item.Get<String>("USERDESCRIPTION");
+                    string fromLngIntMsg = item.Get<String>("INTERNALDESCRIPTION");
+                    string messageCatalog = item.Get<String>("MESSAGECATALOG");
+                    string messageCode = item.Get<String>("MESSAGECODE");
                     
 
                     string toLngMsg = TranslationService.Translate(fromLngMsg, fromLanguage, toLanguage).Result;
@@ -53,10 +49,10 @@ namespace TranslationCore.Imp
                             cmdText.Add("IDDCMESSAGECATALOG", messageCatalog);
                             cmdText.Add("IDDCLANGUAGE", srLanguage);
                             cmdText.Add("MESSAGECODE", messageCode);
-                            cmdText.Add("NOOFPARAMETERS", dr, "NOOFPARAMETERS");
+                            cmdText.Add("NOOFPARAMETERS", item["NOOFPARAMETERS"]);
                             cmdText.Add("INTERNALDESCRIPION", toLngIntMsg);
                             cmdText.Add("USERDESCRIPION", toLngMsg);
-                            cmdText.Add("ISCLIENTSPECIFIC", dr, "ISCLIENTSPECIFIC");
+                            cmdText.Add("ISCLIENTSPECIFIC", item["ISCLIENTSPECIFIC"]);
 
                             cmdText.Value =
                                 "UPDATE DBCORE.DCAPPLICATIONMESSAGE SET INTERNALDESCRIPION=@INTERNALDESCRIPION, USERDESCRIPION=@USERDESCRIPION WHERE IDDCMESSAGECATALOG=@IDDCMESSAGECATALOG AND IDDCLANGUAGE=@IDDCLANGUAGE AND MESSAGECODE=@MESSAGECODE";
@@ -71,7 +67,9 @@ namespace TranslationCore.Imp
                             }
                         }
                     }
-                    OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, messageCatalog + "|" +srLanguage + "|" + messageCode, fromLngMsg + "" + fromLngIntMsg , toLngMsg + "|" + toLngIntMsg, "DBCORE.DCAPPLICATIONMESSAGE"));
+                    OnTranslationEvent(new TranslationEventArgs(
+                        new TranslationInfo(){Resource = "DBCORE.DCAPPLICATIONMESSAGE", Language = fromLanguage, ResourceItemName = messageCatalog + "|" +srLanguage + "|" + messageCode, ResourceItemValue = fromLngMsg + "" + fromLngIntMsg, ResourceItemAdvance = new Advance(){Index = iItemIndex, Total = items.Count}},
+                        new TranslationInfo(){Resource = "DBCORE.DCAPPLICATIONMESSAGE", Language = toLanguage, ResourceItemName = messageCatalog + "|" +srLanguage + "|" + messageCode, ResourceItemValue = toLngMsg + "|" + toLngIntMsg, ResourceItemAdvance=new Advance{Index = iItemIndex, Total = items.Count}}));
                 }
             }
             catch (Exception ex)

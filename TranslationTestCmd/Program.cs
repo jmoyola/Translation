@@ -122,8 +122,8 @@ class Program
         
         ResxBatchTranslation bs = new ResxBatchTranslation();
         bs.TranslationService = txService;
-        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
-        //bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
+        //bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
+        bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
         bs.DefaultLanguage = "en";
         
         Translate(bs, "en", "pt");
@@ -135,7 +135,7 @@ class Program
         
         bs.TranslationEvent += (sender, eventArgs) =>
         {
-            Console.WriteLine($"{eventArgs.Resource}: {eventArgs.ResourceEntryId} ({eventArgs.FromLanguage}->{eventArgs.ToLanguage}) {eventArgs.FromLanguageText}->{eventArgs.ToLanguageText}  " );
+            Console.WriteLine($"{eventArgs.FromTranslationInfo.ResourceAdvance.Index}/{eventArgs.FromTranslationInfo.ResourceAdvance.Total} {eventArgs.FromTranslationInfo.ResourceItemAdvance.Index}/{eventArgs.FromTranslationInfo.ResourceItemAdvance.Total} {eventArgs.FromTranslationInfo.Resource}: {eventArgs.FromTranslationInfo.ResourceItemName} ({eventArgs.FromTranslationInfo.Language}->{eventArgs.ToTranslationInfo.Language}) {eventArgs.FromTranslationInfo.ResourceItemValue}->{eventArgs.ToTranslationInfo.ResourceItemValue}  " );
         };
         bs.Translate(fromLanguage, toLanguage);
     }

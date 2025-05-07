@@ -4,12 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Xml;
 
-namespace ResxTranslation.Imp;
+namespace ResxTranslation.Resx;
 
 public class ResxFile
 {
     private XmlDocument _xmlDocument;
-    private FileInfo _file;
+    private readonly FileInfo _file;
 
     public ResxFile(FileInfo file)
     {
@@ -45,42 +45,38 @@ public class ResxFile
         return ret;
     }
     
-    public IDictionary<XmlAttribute, XmlText> Entries=>GetEntries();
+    public IList<ResxDataNode> Entries=>GetEntries();
 
-    private IDictionary<XmlAttribute, XmlText> GetEntries()
+    private IList<ResxDataNode> GetEntries()
     {
-        var dataNodes=_xmlDocument.SelectNodes("/root/data")?.Cast<XmlNode>();
-        return dataNodes?.Where(v => v.Attributes?["type"] == null).ToDictionary(v=>v.Attributes["name"], v=>(XmlText)v.SelectSingleNode("/data/value/text()"));
+        return _xmlDocument.SelectNodes("/root/data")?.Cast<XmlNode>().Select(v=>new ResxDataNode(v)).ToList();
     }
 
-    private void AddEntry(string key, string value)
+    private ResxDataNode AddEntry(string name, string value)
     {
         var root=_xmlDocument.SelectSingleNode("/root");
-        XmlNode dataNode=root?.AppendChild(_xmlDocument.CreateElement("data"));
-        dataNode.Attributes.Append(_xmlDocument.CreateAttribute("name")).Value=key;
-        XmlNode valueNode=dataNode.AppendChild(_xmlDocument.CreateElement("value"));
-        valueNode.AppendChild(_xmlDocument.CreateTextNode(value));
-    }
-    
-    public XmlNode GetEntry(string key)
-    {
-        return _xmlDocument.SelectSingleNode("/root/data")?.Cast<XmlNode>()
-            .FirstOrDefault(v=>v.Attributes?["name"]?.Value == key);
-    }
-    
-    public void SetEntry(string key, string value)
-    {
-        var node=GetEntry(key);
+        var ret=new ResxDataNode(root?.AppendChild(_xmlDocument.CreateElement("data")));
+        
+        ret.Name=name;
+        ret.Value = value;
 
-        if (node != null)
-        {
-            XmlNode valueNode=(XmlText)node.SelectSingleNode("/data/value/text()");
-            valueNode.Value=value;
-            return;
-        }
-        
-        AddEntry(key, value);
-        
+        return ret;
+    }
+    
+    public ResxDataNode GetEntry(string name)
+    {
+        return Entries.FirstOrDefault(v=>v.Name==name);
+    }
+    
+    public ResxDataNode SetEntry(string name, string value)
+    {
+        var node=GetEntry(name);
+
+        if (node == null)
+            node = AddEntry(name, value);
+
+        node.Value = value;
+        return node;
     }
     
     public bool RemoveEntry(string key)
@@ -95,6 +91,5 @@ public class ResxFile
         }
 
         return false;
-
     }
 }

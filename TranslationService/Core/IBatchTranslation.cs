@@ -2,36 +2,33 @@
 
 namespace TranslationService.Core;
 
+public struct Advance
+{
+    public int Index { get; set; }
+    public int Total { get; set; }
+}
+public struct TranslationInfo
+{
+    public string Resource { get; set; }
+    public string Language { get; set; }
+    public string ResourceItemName { get; set; }
+    public string ResourceItemValue { get; set; }
+    public Advance ResourceAdvance { get; set; }
+    public Advance ResourceItemAdvance { get; set; }
+} 
 public class TranslationEventArgs : EventArgs
 {
-    private readonly string _fromLanguage;
-    private readonly string _toLanguage;
-    private readonly string _resourceEntryId;
-    private readonly string _fromLanguageText;
-    private readonly string _toLanguageText;
-    private readonly string _resource;
+    private readonly TranslationInfo _fromTranslationInfo;
+    private readonly TranslationInfo _toTranslationInfo;
 
-    public TranslationEventArgs(string fromLanguage, string toLanguage, string resourceEntryId, string fromLanguageText, string toLanguageText,
-        string resource)
+    public TranslationEventArgs(TranslationInfo fromTranslationInfo, TranslationInfo toTranslationInfo)
     {
-        _fromLanguage = fromLanguage;
-        _toLanguage = toLanguage;
-
-        _resourceEntryId = resourceEntryId;
-        _fromLanguageText = fromLanguageText;
-        _toLanguageText = toLanguageText;
-        _resource = resource;
+        _fromTranslationInfo = fromTranslationInfo;
+        _toTranslationInfo=toTranslationInfo;
     }
-    public string FromLanguage => _fromLanguage;
+    public TranslationInfo FromTranslationInfo=>_fromTranslationInfo;
+    public TranslationInfo ToTranslationInfo=>_toTranslationInfo;
 
-    public string ToLanguage => _toLanguage;
-
-    public string ResourceEntryId => _resourceEntryId;
-    public string FromLanguageText=> _fromLanguageText;
-
-    public string ToLanguageText => _toLanguageText;
-
-    public string Resource => _resource;
 }
 
 public delegate void TranslationEventHandler(object sender, TranslationEventArgs args);

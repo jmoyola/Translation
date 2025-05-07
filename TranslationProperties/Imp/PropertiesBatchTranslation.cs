@@ -37,9 +37,11 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
         string fromLanguageFilePattern=ph.Replace(FromLanguageFilePattern);
 
         FileInfo fromDir = new FileInfo(fromLanguageFilePattern);
-        
-        foreach (FileInfo fromLanguageFile in fromDir.Directory.EnumerateFiles(fromDir.Name, SearchOption.TopDirectoryOnly))
+
+        var fromLanguageFiles = fromDir.Directory.EnumerateFiles(fromDir.Name, SearchOption.TopDirectoryOnly).ToList();
+        for (int iFromLanguageFileIndex=0; iFromLanguageFileIndex<fromLanguageFiles.Count; iFromLanguageFileIndex++)
         {
+            FileInfo fromLanguageFile = fromLanguageFiles[iFromLanguageFileIndex];
             if(!resourceRegex.IsMatch(fromLanguageFile.Name)) continue;
             
             if (!fromLanguageFile.Exists)
@@ -59,12 +61,17 @@ public class PropertiesBatchTranslation:BaseBatchTranslation
             IFileDictionary<string, string> toLanguagePropertiesFile =
                 new FileDictionary<string, string>(toLanguageFile);
 
-            foreach (var kv in fromLanguagePropertiesFile.Where(v=>translateRegex.IsMatch(v.Key)))
+            var entries = fromLanguagePropertiesFile.Where(v => translateRegex.IsMatch(v.Key)).ToList();
+            for (int iEntryIndex=0; iEntryIndex<entries.Count; iEntryIndex++)
             {
-                string translation = TranslationService.Translate(kv.Value, fromLanguage, toLanguage).Result;
-                OnTranslationEvent(new TranslationEventArgs(fromLanguage, toLanguage, kv.Key, kv.Value, translation, fromLanguageFile.FullName));
+                var entry = entries[iEntryIndex];
+                string translation = TranslationService.Translate(entry.Value, fromLanguage, toLanguage).Result;
+                OnTranslationEvent(new TranslationEventArgs(
+                    new TranslationInfo(){Resource = fromLanguageFile.FullName, Language  = fromLanguage, ResourceItemName = entry.Key, ResourceItemValue = entry.Value, ResourceAdvance = new Advance(){Index = iFromLanguageFileIndex, Total = fromLanguageFiles.Count}, ResourceItemAdvance = new Advance(){Index = iEntryIndex, Total = entries.Count}},
+                    new TranslationInfo(){Resource = toLanguageFile.FullName, Language  = toLanguage, ResourceItemName = entry.Key, ResourceItemValue = translation, ResourceAdvance = new Advance(){Index = iFromLanguageFileIndex, Total = fromLanguageFiles.Count}, ResourceItemAdvance = new Advance(){Index = iEntryIndex, Total = entries.Count}}
+                    ));
                 
-                toLanguagePropertiesFile.Add(kv.Key, translation);
+                toLanguagePropertiesFile.Add(entry.Key, translation);
             }
 
             toLanguagePropertiesFile.Save(Serializer);
