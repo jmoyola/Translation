@@ -1,85 +1,90 @@
-﻿using System.Transactions;
+﻿using System.Globalization;
+using System.Transactions;
 using System.Xml;
 using TranslationService.Core;
+using TranslationService.Utils;
 
 namespace TranslationsWT.Imp;
 
 public class WtTemplateBatchTranslation:BaseBatchTranslation
 {
     public DirectoryInfo BaseDirectory { get; set; }
-    public override void Translate(String fromLanguage, String toLanguage)
+    public override void Translate(CultureInfo fromLanguage, IEnumerable<CultureInfo> toLanguages)
     {
         if(BaseDirectory==null) throw new TranslationException("Base directory not set");
         
-        try
+        String fromLanguageWT = fromLanguage.TwoLetterISOLanguageName == "en"
+            ? "UK"
+            : fromLanguage.TwoLetterISOLanguageName;
+        
+        var templateFiles = BaseDirectory.EnumerateFiles("translations.xml", SearchOption.AllDirectories).ToList();
+        for (int iTemplateFileIndex = 0; iTemplateFileIndex < templateFiles.Count; iTemplateFileIndex++)
         {
-            FileInfo template = new FileInfo(BaseDirectory.FullName
-                                             + Path.DirectorySeparatorChar + "share"
-                                             + Path.DirectorySeparatorChar + "Templates"
-                                             + Path.DirectorySeparatorChar + "translations.xml");
+            var templateFile = templateFiles[iTemplateFileIndex];
             
-            FileInfo templateOut = new FileInfo(BaseDirectory.FullName
-                                             + Path.DirectorySeparatorChar + "share"
-                                             + Path.DirectorySeparatorChar + "Templates"
-                                             + Path.DirectorySeparatorChar + "translations_out.xml");
-
-            if (!template.Exists)
-                throw new TransactionException($"base '{template.FullName}' file dont exists.");
-
-            XmlDocument xd = new XmlDocument();
-            xd.Load(template.FullName);
-            XmlNode? n = xd.ChildNodes[1];
-
-            String fromLanguageWT = fromLanguage == "EN" ? "UK" : fromLanguage;
-            foreach (XmlNode tn in n.ChildNodes)
+            try
             {
-                XmlNode bnt = tn.ChildNodes.Cast<XmlNode>()
-                    .FirstOrDefault(n => n.Name.Equals("trans")
-                                         && n.Attributes.Cast<XmlAttribute>()
-                                             .Any(a => a.Name == "name" && a.Value == fromLanguageWT));
-                if (bnt == null)
-                    continue;
+                XmlDocument xmlDocument = new XmlDocument();
+                xmlDocument.Load(templateFile.FullName);
+                
 
-                String txToTranslate = bnt.Attributes.Cast<XmlAttribute>().FirstOrDefault(a => a.Name == "value")
-                    ?.Value;
+                var allTranslationsNodes = xmlDocument.SelectNodes("/root//trans").Cast<XmlNode>().ToList();
 
-                if (txToTranslate != null)
+                var fromLanguageTranslationsNodes = allTranslationsNodes
+                    .Where(v => v.Attributes["name"]?.Value == fromLanguageWT).ToList();
+
+                foreach (var toLanguage in toLanguages)
                 {
-                    Task<String> txTask =TranslationService.Translate(txToTranslate, fromLanguage, toLanguage);
-                    txTask.Wait();
-                    
-                    XmlAttribute at;
-                    
-                    XmlNode newTxNode =tn.ChildNodes.Cast<XmlNode>()
-                        .FirstOrDefault(n => n.Name.Equals("trans")
-                                             && n.Attributes.Cast<XmlAttribute>()
-                                                 .Any(a => a.Name == "name" && a.Value == toLanguage));
-                    if (newTxNode == null)
+                    for (int iFromLanguageTranslationsNodeIndex = 0;
+                         iFromLanguageTranslationsNodeIndex < fromLanguageTranslationsNodes.Count;
+                         iFromLanguageTranslationsNodeIndex++)
                     {
-                        newTxNode = xd.CreateNode(XmlNodeType.Element, "trans", null);
-                        tn.AppendChild(newTxNode);
-                        
-                        at = xd.CreateAttribute("name");
-                        at.Value = toLanguage;
-                        newTxNode.Attributes.Append(at);
-                    }
+                        var fromLanguageTranslationNode =
+                            fromLanguageTranslationsNodes[iFromLanguageTranslationsNodeIndex];
+                        string resourceItemName = fromLanguageTranslationNode.ParentNode?.Name;
 
-                    at = newTxNode.Attributes.Cast<XmlAttribute>().FirstOrDefault(a => a.Name == "value");
-                    if (at == null)
-                    {
-                        at = xd.CreateAttribute("value");
-                        newTxNode.Attributes.Append(at);
+                        XmlNode toLanguageTranslationNode = allTranslationsNodes.FirstOrDefault(v =>
+                            v.Attributes["name"]?.Value == toLanguage.TwoLetterISOLanguageName);
+                        if (toLanguageTranslationNode == null)
+                        {
+                            toLanguageTranslationNode =
+                                fromLanguageTranslationNode.ParentNode?.AppendChild(xmlDocument.CreateElement("trans"));
+                            toLanguageTranslationNode.Attributes.Append(xmlDocument.CreateAttribute("name")).Value =
+                                toLanguage.TwoLetterISOLanguageName;
+                            toLanguageTranslationNode.Attributes.Append(xmlDocument.CreateAttribute("value"));
+                        }
+
+                        String txToTranslate = fromLanguageTranslationNode.Attributes["value"].Value;
+
+                        string translation = TranslationService.Translate(txToTranslate,
+                            fromLanguage.TwoLetterISOLanguageName, toLanguage.TwoLetterISOLanguageName).Result;
+                        toLanguageTranslationNode.Attributes["value"].Value = translation;
+
+                        OnTranslationEvent(new TranslationEventArgs(
+                                new TranslationInfo()
+                                {
+                                    Language = fromLanguage, Resource = templateFile.FullName,
+                                    ResourceItemName = resourceItemName, ResourceItemValue = txToTranslate
+                                },
+                                new TranslationInfo()
+                                {
+                                    Language = toLanguage, Resource = templateFile.FullName,
+                                    ResourceItemName = resourceItemName, ResourceItemValue = translation
+                                },
+                                new Advance(){Index = iTemplateFileIndex, Total = templateFiles.Count},
+                                new Advance(){Index = iFromLanguageTranslationsNodeIndex, Total = fromLanguageTranslationsNodes.Count}
+                            )
+                        );
                     }
-                    at.Value = txTask.Result;
                 }
 
+                templateFile.Backup();
+                xmlDocument.Save(templateFile.FullName);
             }
-
-            xd.Save(templateOut.FullName);
-        }
-        catch (Exception ex)
-        {
-            throw new TranslationException($"Error in translations '{BaseDirectory.FullName}' root path: {ex.Message}", ex);
+            catch (Exception ex)
+            {
+                throw new TranslationException($"Error in translations '{templateFile.FullName}': {ex.Message}", ex);
+            }
         }
     }
 }

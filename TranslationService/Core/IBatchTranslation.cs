@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
 
 namespace TranslationService.Core;
 
@@ -10,24 +12,30 @@ public struct Advance
 public struct TranslationInfo
 {
     public string Resource { get; set; }
-    public string Language { get; set; }
+    public CultureInfo Language { get; set; }
     public string ResourceItemName { get; set; }
     public string ResourceItemValue { get; set; }
-    public Advance ResourceAdvance { get; set; }
-    public Advance ResourceItemAdvance { get; set; }
 } 
 public class TranslationEventArgs : EventArgs
 {
     private readonly TranslationInfo _fromTranslationInfo;
     private readonly TranslationInfo _toTranslationInfo;
+    private readonly Advance _resourceAdvance;
+    private readonly Advance _resourceItemAdvance;
 
-    public TranslationEventArgs(TranslationInfo fromTranslationInfo, TranslationInfo toTranslationInfo)
+    
+    public TranslationEventArgs(TranslationInfo fromTranslationInfo, TranslationInfo toTranslationInfo,  Advance resourceAdvance, Advance resourceItemAdvance)
     {
         _fromTranslationInfo = fromTranslationInfo;
         _toTranslationInfo=toTranslationInfo;
+        _resourceAdvance = resourceAdvance;
+        _resourceItemAdvance = resourceItemAdvance;
     }
     public TranslationInfo FromTranslationInfo=>_fromTranslationInfo;
     public TranslationInfo ToTranslationInfo=>_toTranslationInfo;
+    public Advance ResourceAdvance => _resourceAdvance;
+    public Advance ResourceItemAdvance => _resourceItemAdvance;
+
 
 }
 
@@ -38,7 +46,7 @@ public interface IBatchTranslation
     ITranslationService TranslationService { get; set; }
     WillCard TranslateKeyFilter { get; set; }
     WillCard ResourceFilter { get; set; }
-    string DefaultLanguage { get; set; }
-    
-    void Translate(String fromLanguage, String toLanguage);
+    CultureInfo DefaultLanguage { get; set; }
+    void Translate(CultureInfo fromLanguage, CultureInfo toLanguage);
+    void Translate(CultureInfo fromLanguage, IEnumerable<CultureInfo> toLanguages);
 }

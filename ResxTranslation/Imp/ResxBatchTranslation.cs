@@ -1,80 +1,102 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using ResxTranslation.Resx;
 using TranslationService.Core;
+using TranslationService.Utils;
 
 namespace ResxTranslation.Imp;
 
 public class ResxBatchTranslation:BaseBatchTranslation
 {
     public DirectoryInfo BaseDirectory { get; set; }
-    public ISet<string> ControlPropertiesToTranslate { get; set; } = new HashSet<string>("Name|Text|Label|Caption|Comment".Split('|'));
+    public ISet<string> ControlPropertiesToTranslate { get; set; } = new HashSet<string>("Text|Label|Caption|Comment".Split('|'));
     
-    public override void Translate(string fromLanguage, string toLanguage)
+    public override void Translate(CultureInfo fromLanguage, IEnumerable<CultureInfo> toLanguages)
     {
         if(BaseDirectory==null) throw new TranslationException("Base directory not set");
         if (!BaseDirectory.Exists) throw new TranslationException($"Base directory '{BaseDirectory.FullName}' does not exist");
         if(TranslateKeyFilter==null) throw new TranslationException("TranslateKeyFilter not set");
         if(ResourceFilter==null) throw new TranslationException("ResourceFilter not set");
-
-        Regex controlPropertiesToTranslateRegex = new Regex("\\.(" +string.Join("|", ControlPropertiesToTranslate) + ")$");
-            
-        Regex translateKeyFilter = new Regex(TranslateKeyFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
-        Regex resourceRegex = new Regex(ResourceFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
-
-        var fromLanguageResourceFiles = BaseDirectory.EnumerateFiles("*.resx", SearchOption.AllDirectories)
-            .Where(v=>resourceRegex.IsMatch(v.Name)).ToList();
         
-        for (int iFromLanguageResourceFile=0; iFromLanguageResourceFile<fromLanguageResourceFiles.Count; iFromLanguageResourceFile++)
+        var fromLanguageResourceFiles = FindResxFiles(fromLanguage, BaseDirectory, ResourceFilter).ToList();
+        for (int fromLanguageResourceFileIndex=0;fromLanguageResourceFileIndex<fromLanguageResourceFiles.Count; fromLanguageResourceFileIndex++)
         {
-            var fromLanguageResourceFile = fromLanguageResourceFiles[iFromLanguageResourceFile];
-                
-            string fromLanguageBaseName;
-            string[] resxNameParts=fromLanguageResourceFile.Name.Split('.');
-            if(resxNameParts.Length==2 && fromLanguage.Equals(DefaultLanguage, StringComparison.OrdinalIgnoreCase))
-                fromLanguageBaseName=resxNameParts[0];
-            else if(resxNameParts.Length>2 && resxNameParts[resxNameParts.Length-2].Equals(fromLanguage, StringComparison.OrdinalIgnoreCase))
-                fromLanguageBaseName=String.Join(".", resxNameParts.Take(resxNameParts.Length-2));
-            else
-                continue;
-            
-            FileInfo toLanguageResourceFile=new FileInfo(fromLanguageResourceFile.Directory?.FullName
-                                                         + Path.DirectorySeparatorChar
-                                                         + fromLanguageBaseName + "." + toLanguage + ".resx");
-            
-            ResxFile fromLanguageResourceFileHandler = new ResxFile(fromLanguageResourceFile);
-            fromLanguageResourceFileHandler.Load();
-            
-            
-            ResxFile toLanguageResourceFileHandler = fromLanguageResourceFile.Exists? new ResxFile(toLanguageResourceFile).Load():fromLanguageResourceFileHandler.Clone(toLanguageResourceFile);
+            var fromLanguageResourceFile = fromLanguageResourceFiles[fromLanguageResourceFileIndex];
+            string fromLanguageBaseName = fromLanguageResourceFile.FileNamePartBase();
 
-            var textEntries = fromLanguageResourceFileHandler.Entries.Where(v => string.IsNullOrEmpty(v.Type)
-                && v.Value!=null).ToList();
-            for (int iTextEntry=0; iTextEntry<textEntries.Count; iTextEntry++)
+            foreach (var toLanguage in toLanguages)
             {
-                var entry = textEntries[iTextEntry];
-                if (translateKeyFilter.IsMatch(entry.Name))
-                {
-                    if (entry.Name.Contains(".") && !controlPropertiesToTranslateRegex.IsMatch(entry.Name))
-                        continue;
+                FileInfo toLanguageResourceFile = new FileInfo(fromLanguageResourceFile.Directory?.FullName
+                                                               + Path.DirectorySeparatorChar
+                                                               + fromLanguageBaseName + "." + toLanguage + ".resx");
 
+                ResxFile fromLanguageResourceFileHandler = new ResxFile(fromLanguageResourceFile);
+                fromLanguageResourceFileHandler.Load();
+
+                if (toLanguageResourceFile.Exists)
+                    toLanguageResourceFile.Backup();
+                
+                ResxFile toLanguageResourceFileHandler = toLanguageResourceFile.Exists
+                    ? new ResxFile(toLanguageResourceFile).Load()
+                    : fromLanguageResourceFileHandler.Clone(toLanguageResourceFile);
+
+                var textEntries = FilterResxTextEntries(fromLanguageResourceFileHandler.Entries);
+
+                for (int iTextEntry = 0; iTextEntry < textEntries.Count; iTextEntry++)
+                {
+                    var entry = textEntries[iTextEntry];
                     
                     string text = entry.Value;
                     string translation = TranslationService
-                        .Translate(text, fromLanguage, toLanguage).Result;
+                        .Translate(text, fromLanguage.TwoLetterISOLanguageName, toLanguage.TwoLetterISOLanguageName)
+                        .Result;
 
                     toLanguageResourceFileHandler.SetEntry(entry.Name, translation);
                     OnTranslationEvent(new TranslationEventArgs(
-                        new TranslationInfo(){Resource = fromLanguageResourceFile.FullName, Language = fromLanguage, ResourceItemName = entry.Name, ResourceItemValue = text, ResourceAdvance = new Advance(){Index = iFromLanguageResourceFile, Total = fromLanguageResourceFiles.Count}, ResourceItemAdvance = new Advance(){Index = iTextEntry, Total = textEntries.Count}},
-                        new TranslationInfo(){Resource = toLanguageResourceFile.FullName, Language  = toLanguage, ResourceItemName  = entry.Name, ResourceItemValue = translation, ResourceAdvance = new Advance(){Index = iFromLanguageResourceFile, Total = fromLanguageResourceFiles.Count}, ResourceItemAdvance = new Advance(){Index = iTextEntry, Total = textEntries.Count}}
-                        ));
+                            new TranslationInfo()
+                            {
+                                Resource = fromLanguageResourceFile.FullName, Language = fromLanguage,
+                                ResourceItemName = entry.Name, ResourceItemValue = text,
+                            },
+                            new TranslationInfo()
+                            {
+                                Resource = toLanguageResourceFile.FullName, Language = toLanguage,
+                                ResourceItemName = entry.Name, ResourceItemValue = translation,
+                            },
+                            new Advance() { Index = fromLanguageResourceFileIndex, Total = fromLanguageResourceFiles.Count },
+                            new Advance() { Index = iTextEntry, Total = textEntries.Count }
+                        )
+                    );
                 }
+
+                toLanguageResourceFileHandler.Save();
             }
-            toLanguageResourceFileHandler.Save();
         }
+    }
+
+    private List<ResxDataNode> FilterResxTextEntries(IEnumerable<ResxDataNode> entries)
+    {
+        Regex controlPropertiesToTranslateRegex = new Regex("\\.(" +string.Join("|", ControlPropertiesToTranslate) + ")$");
+            
+        Regex translateKeyFilter = new Regex(TranslateKeyFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
         
+        var textEntries = entries.Where(v => string.IsNullOrEmpty(v.Type)
+                                             && v.Value != null).ToList();
+
+        textEntries = textEntries.Where(v=>translateKeyFilter.IsMatch(v.Name)).ToList();
+        textEntries=textEntries.Where(v=>!v.Name.Contains(".") || (v.Name.Contains(".")
+                                                                   && !controlPropertiesToTranslateRegex.IsMatch(v.Name))).ToList();
+        return textEntries;        
+    }
+    private IEnumerable<FileInfo> FindResxFiles(CultureInfo language, DirectoryInfo baseDirectory, WillCard resourceFilter)
+    {
+        Regex resourceRegex = new Regex(resourceFilter.ToRegex(), RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        
+        return baseDirectory.EnumerateFiles("*.resx", SearchOption.AllDirectories)
+            .Where(v=>resourceRegex.IsMatch(v.Name) && v.FileNamePartLanguage(DefaultLanguage.TwoLetterISOLanguageName).Equals(language.TwoLetterISOLanguageName));
     }
 }

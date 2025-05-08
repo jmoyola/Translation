@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Globalization;
 using Oracle.ManagedDataAccess.Client;
 using ResxTranslation.Imp;
 using TranslationCore.Imp;
@@ -45,7 +46,7 @@ class Program
         WtTemplateBatchTranslation bs = new WtTemplateBatchTranslation();
         bs.TranslationService = txService;
         bs.BaseDirectory= new DirectoryInfo(@"C:\\Users\\j.oyola\\source\\RS_GitLabRepos\\Configurations_Spor\\Sigma");
-        bs.Translate("EN", "PT");
+        bs.Translate( CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("pt"));
     }
     
     public void CoreBatchTranslation(string[] args)
@@ -84,7 +85,7 @@ class Program
             bs.Cnx = cnx;
 
             cnx.Open();
-            bs.Translate("EN", "PT");
+            bs.Translate( CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("pt"));
             
         }
         finally
@@ -107,7 +108,7 @@ class Program
         bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\frontend-locales_pam\TALO");
         bs.FromLanguageFilePattern = @"{baseDirectory}\{fromLanguage}\*.json";
         bs.ToLanguageFilePattern = @"{baseDirectory}\{toLanguage}\{fileName}";
-        bs.Translate("EN", "PT");
+        bs.Translate( CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("pt"));
     }
     
     public void TestResxBatchTranslations(string[] args)
@@ -122,20 +123,20 @@ class Program
         
         ResxBatchTranslation bs = new ResxBatchTranslation();
         bs.TranslationService = txService;
-        //bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
-        bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
-        bs.DefaultLanguage = "en";
+        bs.BaseDirectory= new DirectoryInfo(@"C:\Users\j.oyola\source\RS_GitLabRepos\WorldTill - Copy");
+        //bs.BaseDirectory = new DirectoryInfo("/tmp/blazor-locale-master");
+        bs.DefaultLanguage =CultureInfo.GetCultureInfo("en_GB");
         
-        Translate(bs, "en", "pt");
+        Translate(bs, CultureInfo.GetCultureInfo("en"), CultureInfo.GetCultureInfo("pt"));
         
     }
 
-    private void Translate(IBatchTranslation bs, string fromLanguage, string toLanguage)
+    private void Translate(IBatchTranslation bs, CultureInfo fromLanguage, CultureInfo toLanguage)
     {
         
         bs.TranslationEvent += (sender, eventArgs) =>
         {
-            Console.WriteLine($"{eventArgs.FromTranslationInfo.ResourceAdvance.Index}/{eventArgs.FromTranslationInfo.ResourceAdvance.Total} {eventArgs.FromTranslationInfo.ResourceItemAdvance.Index}/{eventArgs.FromTranslationInfo.ResourceItemAdvance.Total} {eventArgs.FromTranslationInfo.Resource}: {eventArgs.FromTranslationInfo.ResourceItemName} ({eventArgs.FromTranslationInfo.Language}->{eventArgs.ToTranslationInfo.Language}) {eventArgs.FromTranslationInfo.ResourceItemValue}->{eventArgs.ToTranslationInfo.ResourceItemValue}  " );
+            Console.WriteLine($"{eventArgs.ResourceAdvance.Index}/{eventArgs.ResourceAdvance.Total} {eventArgs.ResourceItemAdvance.Index}/{eventArgs.ResourceItemAdvance.Total} {eventArgs.FromTranslationInfo.Resource}: {eventArgs.FromTranslationInfo.ResourceItemName} ({eventArgs.FromTranslationInfo.Language}->{eventArgs.ToTranslationInfo.Language}) {eventArgs.FromTranslationInfo.ResourceItemValue}->{eventArgs.ToTranslationInfo.ResourceItemValue}  " );
         };
         bs.Translate(fromLanguage, toLanguage);
     }
