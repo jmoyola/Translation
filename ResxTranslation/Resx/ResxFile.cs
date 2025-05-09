@@ -46,12 +46,18 @@ public class ResxFile
     }
     
     public IList<ResxDataNode> Entries=>GetEntries();
+    public IList<ResxAssemblyNode> Assemblies=>GetAssemblies();
 
     private IList<ResxDataNode> GetEntries()
     {
         return _xmlDocument.SelectNodes("/root/data")?.Cast<XmlNode>().Select(v=>new ResxDataNode(v)).ToList();
     }
 
+    private IList<ResxAssemblyNode> GetAssemblies()
+    {
+        return _xmlDocument.SelectNodes("/root/assembly")?.Cast<XmlNode>().Select(v=>new ResxAssemblyNode(v)).ToList();
+    }
+    
     private ResxDataNode AddEntry(string name, string value)
     {
         var root=_xmlDocument.SelectSingleNode("/root");
@@ -59,6 +65,17 @@ public class ResxFile
         
         ret.Name=name;
         ret.Value = value;
+
+        return ret;
+    }
+    
+    private ResxAssemblyNode AddAssemblyEntry(string name, string alias)
+    {
+        var root=_xmlDocument.SelectSingleNode("/root");
+        var ret=new ResxAssemblyNode(root?.AppendChild(_xmlDocument.CreateElement("assembly")));
+        
+        ret.Name=name;
+        ret.Alias = alias;
 
         return ret;
     }
